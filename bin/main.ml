@@ -1,10 +1,10 @@
-exception Exit of string
+exception Goto of int
 
-let rec label_runner _name cont =
-  let goto name =
-    if String.equal name _name
-    then label_runner _name cont 
-    else raise @@ Exit name
+let rec label_runner idx cont =
+  let goto new_idx =
+    if Int.equal new_idx idx
+    then label_runner idx cont 
+    else raise (Goto new_idx)
   in
   cont goto
 
@@ -13,47 +13,32 @@ let label _name _cont =
 
 let (>>) _name _cont = label _name _cont
 
-let getn key haystack = 
-  let rec go i = function
-    | (k, _) :: _ when k = key -> Some i
-    | _ :: tl -> go (succ i) tl
-    | [] -> None
-  in go 0 haystack
-
-let drop n lst =
-  let rec go i = function
-    | _ :: tl when i > 0 -> go (pred i) tl
-    | lst -> lst
-  in go n lst
-
 let run blocks =
-  let rec aux ls =
+  let rec aux i =
     try 
-      match ls with
-      | (_, f) :: tl -> f (); aux tl
-      | [] -> ()
-    with Exit name ->
-      match getn name blocks with
-      | Some i -> aux begin drop i blocks end
-      | None -> ()
-  in aux blocks
+      let (_, f) = blocks.(i) in
+      f ();
+      aux (succ i)
+    with Goto i -> aux i
+       | Invalid_argument _ -> print_endline "oopsie"
+  in aux 0
 
 let () =
   print_newline();
   let i = ref 0 in
-  run [
-    "loop">> begin fun goto ->
-      if !i < 10 then () else goto "end";
+  run [|
+    0>> begin fun goto ->
+      if !i < 10 then () else goto 1;
       Printf.printf "%d: Hello, OCaml!\n" !i;
       i := !i + 1;
-      goto "loop";
+      goto 0;
     end;
-    "end">> begin fun _goto ->
+    1>> begin fun _goto ->
       print_endline "Goodbye, OCaml!";
     end;
-    "_">> begin fun goto ->
+    2>> begin fun goto ->
       i := 0;
-      print_endline "lets start anew";
-      goto "loop"
+      print_endline "Lets start anew";
+      goto 0
     end
-  ]
+      |]
